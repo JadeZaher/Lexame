@@ -1,0 +1,49 @@
+"""
+# Petals-IPFS Microservice Commands
+
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Install IPFS (if not already installed)
+# For Windows:
+# Download from https://dist.ipfs.tech/#go-ipfs and follow installation instructions
+# For macOS:
+# brew install ipfs
+# For Linux:
+# wget https://dist.ipfs.tech/kubo/v0.18.1/kubo_v0.18.1_linux-amd64.tar.gz
+# tar -xvzf kubo_v0.18.1_linux-amd64.tar.gz
+# cd kubo
+# sudo bash install.sh
+
+# 3. Initialize IPFS (first time only)
+ipfs init
+
+# 4. Start IPFS daemon (in a separate terminal)
+ipfs daemon
+
+# 5. Run the microservice
+python app.py
+
+# 6. Test the service (in a separate terminal)
+python test_petals_ipfs.py
+
+# 7. API Usage Examples
+
+# Check service status
+curl http://localhost:8000/status
+
+# Generate text
+curl -X POST http://localhost:8000/generate/text -H "Content-Type: application/json" -d '{"prompt": "The future of AI is", "max_length": 100, "store_on_ipfs": true}'
+
+# Generate image
+curl -X POST http://localhost:8000/generate/image -H "Content-Type: application/json" -d '{"prompt": "A futuristic city with flying cars", "store_on_ipfs": true}'
+
+# Get peers info
+curl http://localhost:8000/peers
+
+# Upload file to IPFS
+curl -X POST http://localhost:8000/ipfs/add -F "file=@/path/to/your/file.txt"
+
+# Retrieve from IPFS (replace HASH with actual IPFS hash)
+curl http://localhost:8000/ipfs/get/HASH
+"""
