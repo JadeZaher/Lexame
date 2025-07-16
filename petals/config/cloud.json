@@ -1,0 +1,48 @@
+{
+    "aws": {
+        "region": "us-east-1",
+        "instance_type": "t3.large",
+        "ami_id": "ami-0c55b159cbfafe1f0",
+        "repo_url": "https://github.com/yourusername/petals.git"
+    },
+    "gcp": {
+        "project_id": "your-project-id",
+        "zone": "us-central1-a",
+        "machine_type": "n1-standard-2",
+        "repo_url": "https://github.com/yourusername/petals.git"
+    },
+    "azure": {
+        "location": "eastus",
+        "vm_size": "Standard_D2s_v3",
+        "resource_group": "petals-resource-group",
+        "repo_url": "https://github.com/yourusername/petals.git",
+        "ssh_public_key": "ssh-rsa YOUR_SSH_PUBLIC_KEY"
+    },
+    "default": {
+        "repo_url": "https://github.com/yourusername/petals.git",
+        "branch": "main",
+        "config": {
+            "text_model": {
+                "name": "bigscience/bloom-petals",
+                "enabled": true
+            },
+            "image_model": {
+                "name": "runwayml/stable-diffusion-v1-5",
+                "enabled": true
+            },
+            "ipfs": {
+                "api": "/ip4/127.0.0.1/tcp/5001",
+                "enabled": true
+            },
+            "server": {
+                "host": "0.0.0.0",
+                "port": 8000,
+                "debug": false
+            },
+            "security": {
+                "require_wallet": true,
+                "allowed_addresses": []
+            }
+        }
+    }
+}

@@ -11,6 +11,9 @@ import aiofiles
 import time
 from pathlib import Path
 
+from petals.wallet import WalletManager
+from petals.config import Config
+
 # Petals for distributed text generation
 from petals import AutoDistributedModelForCausalLM
 from transformers import AutoTokenizer
@@ -20,10 +23,13 @@ from diffusers import StableDiffusionPipeline
 
 app = Sanic("PetalsIPFSMicroservice")
 
-# Configuration
-TEXT_MODEL_NAME = "bigscience/bloom-petals"
-IMAGE_MODEL_NAME = "runwayml/stable-diffusion-v1-5"
-IPFS_API = "/ip4/127.0.0.1/tcp/5001"  # Default local IPFS daemon address
+# Load configuration
+config = Config()
+
+# Configuration variables
+TEXT_MODEL_NAME = config.get("text_model.name", "bigscience/bloom-petals")
+IMAGE_MODEL_NAME = config.get("image_model.name", "runwayml/stable-diffusion-v1-5")
+IPFS_API = config.get("ipfs.api", "/ip4/127.0.0.1/tcp/5001")
 CACHE_DIR = "./cache"
 
 # Global variables
@@ -31,6 +37,9 @@ text_model = None
 text_tokenizer = None
 image_model = None
 ipfs_client = None
+
+# Wallet manager instance
+wallet_manager = WalletManager()
 
 # Create cache directory if it doesn't exist
 Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
@@ -103,6 +112,9 @@ async def status(request):
         "ipfs": {
             "connected": ipfs_client is not None,
             "peer_id": ipfs_client.id()["ID"] if ipfs_client else None
+        },
+        "wallets": {
+            "registered_instances": len(wallet_manager.wallets)
         }
     })
 
@@ -113,6 +125,12 @@ async def generate_text(request):
     # Check if model is loaded
     if text_model is None or text_tokenizer is None:
         return json({"error": "Text model is still loading"}, status=503)
+    
+    # Wallet check if required
+    if config.get("security.require_wallet", True):
+        instance_id = request.headers.get("X-Instance-ID")
+        if not instance_id or not wallet_manager.verify_instance(instance_id):
+            return json({"error": "Unauthorized: Invalid or missing instance ID"}, status=401)
     
     # Get the prompt from the request
     data = request.json
@@ -167,6 +185,12 @@ async def generate_image(request):
     # Check if model is loaded
     if image_model is None:
         return json({"error": "Image model is still loading"}, status=503)
+    
+    # Wallet check if required
+    if config.get("security.require_wallet", True):
+        instance_id = request.headers.get("X-Instance-ID")
+        if not instance_id or not wallet_manager.verify_instance(instance_id):
+            return json({"error": "Unauthorized: Invalid or missing instance ID"}, status=401)
     
     # Get the prompt from the request
     data = request.json
@@ -295,5 +319,68 @@ async def get_peers(request):
     except Exception as e:
         return json({"error": str(e)}, status=500)
 
+@app.route("/wallet/register", methods=["POST"])
+async def register_wallet(request):
+    """
+    Register a new training instance with wallet signature verification.
+    Expected JSON body:
+    {
+        "signature": "<signature>",
+        "message": "<message>",
+        "address": "<wallet_address>"
+    }
+    """
+    data = request.json
+    if not data:
+        return json({"error": "Missing JSON body"}, status=400)
+    
+    signature = data.get("signature")
+    message = data.get("message")
+    address = data.get("address")
+    
+    if not signature or not message or not address:
+        return json({"error": "Missing required fields"}, status=400)
+    
+    try:
+        instance_id = wallet_manager.register_instance(signature, message, address)
+        return json({"instance_id": instance_id, "message": "Wallet registered successfully"})
+    except Exception as e:
+        return json({"error": str(e)}, status=400)
+
+@app.route("/wallet/verify/<instance_id>", methods=["GET"])
+async def verify_wallet(request, instance_id):
+    """Verify if a training instance is registered and active"""
+    try:
+        active = wallet_manager.verify_instance(instance_id)
+        return json({"instance_id": instance_id, "active": active})
+    except Exception as e:
+        return json({"error": str(e)}, status=400)
+
+@app.route("/wallet/deactivate/<instance_id>", methods=["POST"])
+async def deactivate_wallet(request, instance_id):
+    """
+    Deactivate a training instance.
+    Expected JSON body:
+    {
+        "signature": "<signature>",
+        "address": "<wallet_address>"
+    }
+    """
+    data = request.json
+    if not data:
+        return json({"error": "Missing JSON body"}, status=400)
+    
+    signature = data.get("signature")
+    address = data.get("address")
+    
+    if not signature or not address:
+        return json({"error": "Missing required fields"}, status=400)
+    
+    try:
+        result = wallet_manager.deactivate_instance(instance_id, signature, address)
+        return json({"instance_id": instance_id, "deactivated": result})
+    except Exception as e:
+        return json({"error": str(e)}, status=400)
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    app.run(host=config.get("server.host", "0.0.0.0"), port=config.get("server.port", 8000), debug=config.get("server.debug", False))
